@@ -1,0 +1,256 @@
+
+Hotspot, Repeater, Dongle operating mode
+----------------------------------------
+
+Serial Communication with
+DV-RPTR, DV-ATRX and DV-Modem (Siemens C5)
+------------------------------------------
+
+PCP2-Protocol
+-------------
+"Packet Communication Protiocl Version 2"
+
+On Siemens C5, PCP is used for communication with the main µP via TTL-serial
+link (5V; 57600baud 8N1). The protocol is described in SC5BOS development manual.
+The main features:
+- split up into 10 ports (endpoints in C5)
+- up to 256 byte payload
+- CRC CCITT 16bits (irgnore leading zeroes)
+- short frames (3 byte length) with XOR check-byte
+
+The PCP2 has some improvements:
+- optional split up into 8 endpoints (cmd byte is now part of payload)
+- up to 65535 byte payload possible
+- only one kind of frame and one frame ID (byte '0xD0')
+- CRC CCITT 16bits (irgnore leading zeroes) like PCP
+
+
+PCP2 frame structure:
+--------------------
+
+00 START-ID
+01 Length lower byte (Length of payload only - offset 03 to first crc-byte)
+02 Length upper byte (Length is in little endian - "PC ready")
+03 Payload first byte, should be used as CMD/Message/EP declaration
+04 Payload 2nd byte
+..
+L1 CRC upper byte	(L1 is position Length +3)
+L2 CRC lower byte	(L2 is position Length +4)
+
+Structure of CMD Byte
+---------------------
+
+Bit    Meaning
+  7    Response-Bit, its set to '1' in a reply of a "GET" cmd
+  6..4 Endpoint definition ("0" DFU bootloader, "1" Hotspot/Repeater ...)
+  3..0 Command / Cmd-Group: if 16 different cmds enough, use it as a cmd,
+       if not: preselector of a cmd-group, next byte is cmd
+       (DFU-Bootloader and Hotspot uses a few cmds only)
+
+
+Hotspot/Repeater Messages
+-------------------------
+
+Commands / Messages used:
+  0x10 RPTR_GET_STATUS	CMD Get/Set Status information -> answer  
+  0x11 RPTR_GET_VERSION	CMD Get Version information -> answer
+  0x12 RPTR_GET_SERIAL	CMD Get Serial Number -> answer (32bit number)
+  0x13 RPTR_GET_CONFIG	CMD Get (monolitic) configuration block -> answer
+  0x14 RPTR_SET_CONFIG	CMD Update configuration block -> answer (ACK/NAK)
+  0x15 RPTR_RXPREAMBLE	MSG Message from device: Preamble detected
+  0x16 RPTR_START	MSG A reception starts (START-PATTERN in bitstream)
+  0x17 RPTR_HEADER	MSG A header was received (header is decoded in payload)  
+  0x18 RPTR_RXSYNC	MSG A FRAME-SYNC-PATTERN received (missing START/HEADER)
+  0x19 RPTR_DATA	MSG Voicedata
+  0x1A RPTR_EOT		MSG A STOP-PATTERN, end-of-transmission received
+  0x1B RPTR_RXLOST	MSG Sync lost (no valid reception anymore)
+  0x1C..0x1E		rsvd for future use
+  0x1F RPTR_SET_TESTMDE	CMD Enabled / Disable Transmitter Test
+  
+
+/* handle_hfdata() processes bit-flags from rptr_func
+ * A typical reception look like this:
+ *
+ * D0 | 03 00 | 15 | 00 00 crc crc	>Preamble detected (not implemented jet)
+ * D0 | 03 00 | 16 | 01 00 crc crc	>Start-Frame-Pattern detected
+ * D0 | 2C 00 | 17 | 01 00 {header data} crc crc
+ *                      ^ Biterrors in header (not implemented jet)
+ * D0 | 0F 00 | 19 | 01 00 {VoiceData} 55 2D 16 crc crc > Voicedata with FrameSync
+ *                      ^ pktcount 0 to 20 (defined by Receive-Buffer-Size-1)
+ * D0 | 0F 00 | 19 | 01 01 {VoiceData} {SlowData} crc crc > Slowdata not descrambled
+ * ...
+ * D0 | 03 00 | 1A | 01 00 crc crc	> End of Transmission
+ *                   ^ transmission counter 1..255,0
+ *              ^ cmd / type of paket ( = part of pkt-data )
+ *      ^ Length of Data (packetlength-5)
+ * ^ FramestartID
+ */
+
+Receiving
+---------
+
+1.  A PREAMBLE-Message was send (not implemented jet).
+2a. A START-Message was send.
+2b. A RXSYNC-Message was send (missing START-PATTERN/Header)
+3.  A HEADER was send (137.5ms after START), no message in the case of 2b.
+4.  VOICE-DATA packets was send in 20ms gaps
+5a. A EOT was send ( STOP-FRAME-PATTERN received)
+5b. A RXLOST was send ( no sync-frame-pattern detected )
+
+
+Transmitting
+------------
+
+1. Send START (optional).
+   If a long TX-Delay (>138ms) configured, the transmitter turns on
+   (if <= 138ms this cmd does nothing).
+2. Send HEADER.
+   The transmitter turns on, if off. If TX on a "BREAK" (EOT->Sync) was generated.
+3. Send VOICEDATA
+   USE the same ID you used on HEADER-msg and KEEP counting (PKTcount). If some
+   packets lost, the gap is filled with silence. You can retransmit lost packets.
+   Count up to Transmit-Buffer-Size-1, then restart with #0.
+
+4a. Stop sending VOICEDATA
+   results in stopping transmission after the last VOICE-packet is transmitted.
+   A STOP PATTERN is append before PTT goes off.
+4b. Send EOT-Cmd
+   This geneates a STOP PATTERN just after the current VOICE-packet. After this
+   the PTT goes off. 
+
+
+
+RPTR_GET_STATUS
+---------------
+
+Cmd    = 0x10
+Param# = 0 Bytes
+-> Returns following:
+
+0x90 Flags(16) TX-State(8) Receive-Buffer(8) Transmit-Buffer(8) Unsend-Frames(8)
+
+Flags (Bitset):
+Bit0 : Receiver enabled
+Bit1 : Transmitter enabled
+Bit2 : PC Watchdog enabled
+Bit3 : Checksum-Calculation enabled (check packets received from PC)
+Bit4 : I/O 21 Status (Jumper-Configuration)
+Bit5 : I/O 23 Status (Jumper-Configuration)
+Bit6 : rsvd
+Bit7 : (1) physical layer not configured (C0 config see below).
+Bit8 : Receiving
+Bit9 : Transmitting (PTT enabled) 
+Bit10: PC Watchdog occured! (RX/TX disabled)
+Bit11: PCP2 Checksum checked on reception
+...
+
+TX-State(8)        : Enum (Disabled, TXdelay, Sync, Start, Header, Voicedata, EOT)
+Receive-Buffer(8)  : Number of Voice-Frame-History available (current: 21)
+Transmit-Buffer (8): Number of Voice-Frame-Buffers available (current: 252)
+Unsend-Frames (8)  : Number of unsend Voice-Frames, if 0 the RPTR ends transmission
+
+
+RPTR_SET_STATUS
+---------------
+Cmd    = 0x10, like GET
+Param# = 1 Byte
+
+Parameter 1 Byte (Bitset):
+Bit0: Enable/Disable Receiver
+Bit1: Enable/Disable Transmitter
+Bit2: Enable/Disable PC Watchdog
+Bit3: Enable/Disable Checksum-Calculation
+
+-> Command returns ACK if success or NAK.
+
+--------------------------------------------------------------------------------
+
+RPTR_GET_VERSION
+---------------
+Cmd    = 0x11
+Param# = 0 Bytes
+-> Returns a 16bit unsigned number and a ASCII string with a short identifier
+and a release date. Example:
+... 91 01 05 ... <- Version Vxx.yy (last digit is char ' ', a, b...)
+
+ What can be read from this version - String?
+ V0.50a ( 0x0501 )
+ * Main Version  0 - This Project is in a early developing state
+ * Subversion    5 - Suberversion, increased, if new features implemented
+ * Subsubversion 0 - Increased if parts of the source are rewritten or optimized
+ * Bugfixlevel   a - Increased with one or more bugfixes (at the same time)
+
+folloed b y a ASCII-Sting (no length byxte, no zero termination):
+"DV-RPTR R. 2011-08.30"
+
+
+RPTR_GET_SERIAL
+---------------
+
+Cmd    = 0x12
+Param# = 0 Bytes
+-> returns a 32bit unsigned number, read from bootloader area
+
+
+
+RPTR_GET_CONFIG
+---------------
+reads out the current configuration blocks.
+
+The Basic configuration needs the following parameters:
+
+- RX-Inversion needed (1bit)
+- TX-Inversion needed (1bit)
+- TX-Channel select (1bit)
+- TX-Modulation Voltage V peak-peak (8bit unsigned 0..255)
+- TX delay (16bit unsigned, [ms])
+- opt. (PC Watchdog Counter (16bit unsigned [ms]))
+
+To have the option for expanding the config later, I prefer a very simple
+sub-frame format:
+
+<config-block-id> <blocksize> <config-block> <next config-block-id>
+
+So I define:
+
+ID   = Function
+0xC0 = Physical Layer Config
+0xC1 = Watchdog
+0xC2 to 0xCF for future use (not needed in a simple modem firmware)
+
+0xC0 Block (Length 4 Byte):
+ <Flags> <modulation Vpp (8)> <txdelay (16)>
+
+  Flags:
+  Bit 0 = RX-Inversion
+  Bit 1 = TX-Inversion
+  Bit 2 = TX-Channel-B Select (AFSK-Pin)
+  Bits 3-7: reserved for future use, set to 0
+
+
+0xC1 Block (Length 2 Byte):
+ <watchdog value>
+
+using GET command:
+Send it w/o a parameter, all implemented config blocks a transfered to the pc.
+Send it with 1 byte parameter (config-block-id), only one block (or NAK if not
+available) transfered back.
+
+
+RPTR_SET_CONFIG
+---------------
+like GET_CONFIG, but to put the configuration into DV_RPTR.
+You can combine all blocks together or just send one or some blocks.
+-> this cmd returns a ACK, if configuration was accepted, otherwise NAK.
+
+
+RPTR_SET_TESTMDE
+----------------
+Cmd    = 0x1F
+Param# = 1 Byte (interpret it as bool)
+
+Enables (true) or diables the endless tranmit test mode. Its useful to calibrate
+the modulation level.
+
+-> returns ACK if success or NAK in the case of failure (DV-RPTR transmitting or
+   TX disabled).

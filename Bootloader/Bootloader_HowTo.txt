@@ -1,0 +1,58 @@
+
+Bootloader HowTo
+----------------
+
+What you need for an firmware udpate (USB DFU):
+
+1. LibUSB win32:
+http://sourceforge.net/projects/libusb-win32/
+
+2. dfu-util (openMoko) Windows version:
+http://projects.openmoko.org/projects/dfu-util-win32/	(in the moment offline)
+
+3. INF file ("driver")
+This file can be created with the "inf-wizard" tool supplied with LibUSB.
+
+Build the INF file
+------------------
+
+Unzip 'libusb-win32-bin-1.2.x.x.zip' into a exsiting folder (it contains a sub-
+folder 'libusb-win32-bin-1.2.x.x').
+
+Connect your DFU compatible device and power it up in bootloader mode.
+Example DV-RPTR: Set 'force bootloader' jumper, connect it with power + USB.
+
+start 'libusb-win32-bin-1.2.x.x\bin\inf-wizard.exe'
+
+in the dialog, select the device, you want do build a driver for.
+
+---
+
+Reconnect USB cable to your device.
+
+Now you can install this new driver for it: The libusb will be copied into your
+Windows system folders.
+
+
+Using dfu-util for update:
+--------------------------
+(libusb-win32 is correctly installed for your USB-DFU device)
+
+Connect your DFU compatible device and power it up in bootloader mode.
+Example DV-RPTR: Set 'force bootloader' jumper, connect it with power + USB.
+
+Save your firmware file into a folder (fw-folder).
+open a command window (cmd.exe).
+Type <drive>:\<dfu-util-folder>\dft-util.exe -D <fw-folder>\<firmware file>
+Wait 2-4 seconds until the new firmware is flashed.
+
+Disconnecd your DFU device from power and reconneced it without a 
+'force bootloader' jumper (for example).
+
+Problems:
+--------
+1. more than one DFU devices exists in your system (example Lenovo R500 notebook)
+   Solution: use additional parameter "-d" and type the usb vendor / product ID
+   Example: "-d 0x0403:0x92AE" for the DV-RPTR.
+2. Download hangs at start.
+   Solution: Its a issure of dfu-util. Try again after a new power up.

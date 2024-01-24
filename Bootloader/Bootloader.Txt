@@ -1,0 +1,23 @@
+
+DV-RPTR Bootloader
+------------------
+
+The DV-RPTR Board is shipped with a DFU V1.1 compatible bootloader. You can
+DOWN- and UPload a firmware file using a USB connection or a serial link.
+Serial (RS232 115200baud 8N1) is available only as TTL compatible signals on
+expandion port SV2. Use a level shifter to connect RxD, TxD on a RS232 PC port.
+
+The bootloader program is almost the same like the loaders from DV-Modem and
+DV-ATRX. To activate in a firmware program, set the ISP force fuse and reboot.
+
+Activation external / force:
+To force the loader program, set a jumper on expansion I/O20 to GND (Pin13-14
+at SV2) and connect power.
+
+LED signaling:
+RED flashes slowly   - bootloader standby (IDLE)
+GREEN flashes slowly - USB connected, standby
+RED flashes fast     - indicating flash memory write operations
+YELLOW               - bootloader change to serial link mode
+
+After 30s in IDLE mode the loader turns off LEDs (POWERDOWN mode).

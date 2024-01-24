@@ -1,0 +1,90 @@
+
+Draft
+-----
+
+RPTR_GET_STATUS
+---------------
+
+Cmd    = 0x10
+Param# = 0 Bytes
+-> Returns following:
+
+0x90 Flags(16) TX-State(8) Receive-Buffer(8) Transmit-Buffer(8) Unsend-Frames(8)
+
+Flags (Bitset):
+Bit0: Receiver enabled
+Bit1: Transmitter enabled
+Bit2: PC Watchdog enabled
+Bit3: Checksum-Calculation enabled (check packets received from PC)
+Bit4: I/O 21 Status (Jumper-Configuration)
+Bit5: I/O 23 Status (Jumper-Configuration)
+...
+Bit7: (1) physical layer not configured (C0 config see below).
+...
+Bit8 : Receiving
+Bit9 : Transmitting (PTT enabled) 
+Bit10: PC Watchdog occured! (RX/TX disabled)
+Bit11: PCP2 Checksum checked on reception
+...
+
+TX-State(8)        : Enum (Disabled, TXdelay, Sync, Start, Header, Voicedata, EOT)
+Receive-Buffer(8)  : Number of Voice-Frames available (current: 21)
+Transmit-Buffer (8): Number of Voice-Frames available (current: 21)
+Unsend-Frames (8)  : Number of unsend Voice-Frames, if 0 the RPTR ends transmission
+
+RPTR_SET_STATUS
+---------------
+
+Cmd    = 0x10
+Param# = 1 Byte
+
+Parameter 1 Byte (Bitset):
+Bit0: Enable/Disable Receiver
+Bit1: Enable/Disable Transmitter
+Bit2: Enable/Disable PC Watchdog
+Bit3: Enable/Disable Checksum-Calculation
+
+--------------------------------------------------------------------------------
+
+
+RPTR_GET_CONFIG
+---------------
+reads out the current configuration blocks.
+
+The Basic configuration needs the following parameters:
+
+- RX-Inversion needed (1bit)
+- TX-Inversion needed (1bit)
+- TX-Channel select (1bit)
+- TX-Modulation Voltage V peak-peak (8bit unsigned 0..255)
+- TX delay (16bit unsigned, [ms])
+- opt. (PC Watchdog Counter (16bit unsigned [ms]))
+
+To have the option for expanding the config later, I prefer a very simple
+sub-frame format:
+
+<config-block-id> <blocksize> <config-block> <next config-block-id>
+
+So I define:
+
+ID   = Function
+0xC0 = Physical Layer Config
+0xC1 = Watchdog
+
+0xC0 Block (Length 4 Byte):
+ <Flags> <modulation Vpp> <txdelay>
+
+0xC1 Block (Lenght 2 Byte)
+ <watchdog value>
+ 
+using GET command:
+Send it w/o a parameter, all implemented config blocks a transfered to the pc.
+Send it with 1 byte parameter (config-block-id), only one block (or NAK if not
+available) transfered back.
+
+
+RPTR_SET_CONFIG
+---------------
+like GET_CONFIG, but to put the configuration into DV_RPTR.
+You can combine all blocks together or just send one or some blocks.
+

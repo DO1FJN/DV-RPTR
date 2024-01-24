@@ -1,0 +1,43 @@
+Installation Instructions DVRPTR Control Center for LINUX
+=========================================================
+
+The executable file for Linux and Windows is the same file,
+this file is running on both systems.
+
+Under Windows just start the exe file.
+
+Under Linux a couple of step have to be done to prepare
+the system for DVRPTR:
+
+Linux Distribution used: Ubuntu 10.10-alternate
+
+This distribution runs reliably even an small, slow systems like
+the Fujitsu/Siemens Thinclient and others.
+
+Memory: 510 MB recommended
+CPU: minimum 500 MHz
+
+1) Install this Ubuntu version and test if it is running properly
+2) Open the Synaptic Installer and install the package mono-complete
+
+usually this should be all to do. Unfortunately the package mono-complete
+has a bug (October 2011), and a patch must be installed:
+
+3) download the file:  http://miszacus.net/files/UiaAtkBridge.dll.zip
+4) unzip it and copy UiaAtkBridge.dll into the folder:
+   /usr/lib/mono/gac/UiaAtkBridge
+
+Now your Ubuntu System is ready to run DVRPTR Control Center:
+
+5) copy dvrptr.exe to your home folder  /home/yourname
+6) go into your home folder and start mono and give dvrptr.exe as parameter:
+   mono dvrptr.exe
+7) There is no need to install a driver. Just connect the DVRPTD board to USB.
+8) The device /dev/ttyACM0 (or 1,2 or 3) appears when the board is connected. 
+   Choose this device name in the "Modem" tab.
+
+The Linux installation runs more robust and reliable as the Windows version.
+If you plan to build a repeater, linux is the better choice.
+
+For home use you can use Windows or Linux.
+

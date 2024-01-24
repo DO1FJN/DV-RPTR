@@ -1,0 +1,81 @@
+AMBE addon board configuration
+------------------------------
+
+2 new configuration block (0xC2, 0xC3) available for configure the "dongle":
+
+Block C2
+--------
+content: Control-flags (enable), Routing + MyCall for dongle transmissions
+length : 40 bytes
+bytes:
+00 Enable/Disable Flags
+01 rsvrd
+02 rsvrd
+03 rsvrd
+04 RPT2 (8 byte)
+0C RPT1 (8 byte)
+14 YOURCALL (8 byte)
+1C MYCALL (8 byte)
+24 MYSIGN (4 byte)
+
+Enable/Disable bit-flags:
+0: AMBE decoding voicedata from HF (receiving)
+1: AMBE decoding voicedata from Internet (USB) when tranmitting
+2: rsvd
+3: rsvd
+4: Enable Dongle PTT (push PTT on microphone results in transmitting)
+
+
+Block C3
+--------
+content: 'Icom Message Text (20 chars) for dongle transmissions
+length : 20 bytes
+example: C3 14 "This is a 20chr txt."
+
+Block C4
+--------
+content: Analog Frontend Configuration
+length : 8 bytes
+bytes:
+00 Microphone PGA Gain (0..59.5dB, 0.5dB per Step)
+01 Microphone Impedance and BIAS Selection (10,20,40kOhm, 1x100n, 2x100n)
+02 ADC Gain Value (signed, -12 to 20dB; 0.5dB steps)
+03 ADC Filter (select one of three input-DSP-filters; 0,1,2)
+04 SpeakerOut (Off= -127, -126..36 (-78.3dB..18dB, mostly 0.5dB steps)
+05 Handset (SpeakerMicro) Gain (9dB downto -78.3dB, mostly 0.5dB steps)
+06 DAC volume (signed -63.5dB..+24dB; 0.5dB steps) and knob-control (value=0x7F)
+07 DAC filter selection (select a filter chain; see datasheet)
+
+Block C5
+--------
+content: AutomaticGainControl und DynamicRangeControl configuration
+length : 12 bytes
+bytes: 
+00 AGC Control 1
+01 AGC Control 2
+02 AGG Maximum Gain (0 to 59.5dB, 0.5dB steps)
+03 AGC Attack Time
+04 AGC Debounce Time
+05 AGC Noise Debounce
+06 AGC Signal Debounce
+07 reserved
+08 DRC Control 1 (bit6=enable)
+09 DRC Control 2
+0A DRC Control 3
+0B reserved
+
+--------------------------------------------------------------------------------
+
+New SFCs (special function commands):
+
+1F C2   : Get AMBE board capabilities (returns 32bit value, Bit0=1 ^= availabe)
+1F 40 00: disable dongle transmission (Bit 0 of value)
+1F 40 01: manual enable dongle transmission (Bit 0 of value)
+
+1F 41 xx yy: Set volume for...
+-----------
+xx==00: DAC (Master) volume -127..48 (x 0.5dB)
+        set yy to 0x7F (127) to enable PIN (poti) control knob
+xx==01: handset (speakermicro) volume -127..18 (x 0.5dB)
+xx==02: speaker (ClassD amp) volume -127..36 (x 0.5dB)
+xx==03: ADC digital gain (-24..40 ^= -12dB..20dB)
